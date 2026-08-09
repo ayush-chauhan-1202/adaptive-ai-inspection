@@ -1,0 +1,22 @@
+project:
+  name: adaptive-ai-inspection
+  version: "0.1.0"
+  seed: 42
+
+data:
+  image_size: 256
+
+  train_split: 0.70
+  validation_split: 0.15
+  test_split: 0.15
+
+preprocessing:
+  grayscale: false
+  normalize: true
+
+baseline:
+  method: classical_anomaly
+
+evaluation:
+  primary_metric: auprc
+  threshold_metric: f1
