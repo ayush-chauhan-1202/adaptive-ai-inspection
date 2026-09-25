@@ -42,33 +42,33 @@ Continuous Improvement
 
 Milestones
 
-Milestone 0
+Milestone 0 — Complete
 
 Problem definition and system architecture.
 
-Milestone 1
+Milestone 1 — Complete
 
 Dataset and classical anomaly-detection baseline.
 
-Milestone 2
+Milestone 2 — Complete
 
-Deep-learning baseline.
+Deep-learning baseline (learned visual embeddings).
 
-Milestone 3
+Milestone 3 — Complete
 
-Modern anomaly detection and localization.
+Modern anomaly detection and localization (patch-based, PatchCore-style, using a pretrained ResNet-18 feature extractor and a patch-level memory bank).
 
-Milestone 4
+Milestone 4 — Complete
 
-Rare and unseen defect detection.
+Rare and unseen defect detection, validated by holding out a defect type entirely from training and measuring detection rate on it specifically.
 
-Milestone 5
+Milestone 5 — Complete
 
-Human-in-the-loop inspection.
+Human-in-the-loop inspection: a triage layer that routes predictions into AUTO_NORMAL, HUMAN_REVIEW, or AUTO_DEFECT based on confidence, rather than forcing a single automatic call on every image.
 
-Milestone 6
+Milestone 6 — In Progress
 
-MLOps foundation.
+MLOps foundation: packaging the inspection pipeline behind a REST API and containerizing it for deployment.
 
 Milestone 7
 
@@ -110,6 +110,6 @@ Introduce additional complexity only when those limitations justify it.
 
 Current Status
 
-Milestone 0 — Problem Definition & Architecture
+Milestones 0-5 are complete. The platform has a working PatchCore-style anomaly localization pipeline validated on MVTec AD, tested for generalization to a held-out unseen defect type, and wrapped in a human-in-the-loop triage layer.
 
-The next milestone will implement the first working inspection baseline.
+Milestone 6 (MLOps foundation) is underway: wrapping the pipeline in a REST API and container so it can be deployed and called as a service rather than run as a script.
