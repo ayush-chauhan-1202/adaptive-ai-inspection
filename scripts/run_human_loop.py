@@ -1,5 +1,5 @@
-from pathlib import Path
 import csv
+from pathlib import Path
 
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -13,7 +13,6 @@ from inspection.localization.patchcore import (
 from inspection.localization.triage import (
     classify_score,
 )
-
 
 DATA_ROOT = Path(
     "data/raw/mvtec_anomaly_detection"

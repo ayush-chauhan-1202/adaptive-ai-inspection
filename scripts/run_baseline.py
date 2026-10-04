@@ -3,15 +3,12 @@ from pathlib import Path
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-import matplotlib.pyplot as plt
-from inspection.visualization.inspection import plot_inspection_result
-
 from inspection.data.mvtec import MVTecDataset
 from inspection.evaluation.metrics import evaluate
 from inspection.features.classical import extract_features
 from inspection.models.anomaly import ClassicalAnomalyDetector
 from inspection.preprocessing.image import load_grayscale, normalize_image
-
+from inspection.visualization.inspection import plot_inspection_result
 
 DATA_ROOT = Path("data/raw/mvtec_anomaly_detection")
 

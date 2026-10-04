@@ -66,37 +66,44 @@ Rare and unseen defect detection, validated by holding out a defect type entirel
 
 Human-in-the-loop inspection: a triage layer that routes predictions into AUTO_NORMAL, HUMAN_REVIEW, or AUTO_DEFECT based on confidence, rather than forcing a single automatic call on every image.
 
-**Milestone 6 — In Progress**
+**Milestone 6 — Complete**
 
-MLOps foundation: packaging the inspection pipeline behind a REST API and containerizing it for deployment.
+MLOps foundation: the pipeline is wrapped behind a FastAPI REST API (`/inspect`, `/health`, `/version`, `/metrics`), containerized with a multi-stage Dockerfile, and trained models are logged, versioned, and registered through MLflow (experiment tracking + Model Registry) instead of living as an in-memory object inside a script.
 
-**Milestone 7**
+**Milestone 7 — Complete**
 
-Production inference.
+Production inference: the API loads whichever model is aliased `production` in the MLflow Model Registry rather than a hardcoded path, so promoting a new model never requires a redeploy. Structured JSON logging and real input validation (size limits, decode errors) replace the print-statement style of the milestone scripts. Deployed to Cloud Run — see `RUNBOOK.md` for the one-time GCP setup and the live URL.
 
-**Milestone 8**
+**Milestone 8 — Complete**
 
-CI/CD.
+CI/CD via GitHub Actions: `ci.yml` runs ruff + the full pytest suite on every PR; `cd.yml` builds the image, pushes it to Artifact Registry, and deploys to Cloud Run on every merge to `main`.
 
-**Milestone 9**
+**Milestone 9 — Complete (scoped)**
 
-Monitoring and drift detection.
+Monitoring and drift detection: the API exposes Prometheus-format metrics (`/metrics`), and `scripts/run_drift_report.py` runs an Evidently comparison between training-time and recent production score distributions, producing an HTML report and a non-zero exit code when drift is flagged. A hosted Grafana dashboard was intentionally left out for now — the metrics endpoint is there and wiring a dashboard to it later is a config change, not new code; building one now wasn't worth the account-setup time for a low-traffic demo service.
 
-**Milestone 10**
+**Milestone 10 — Scaffolded (manual trigger)**
 
-Continuous improvement and automated retraining.
+Continuous improvement: `scripts/retrain_and_promote.py` implements real champion/challenger evaluation (a new model is only promoted if it beats the current production model on AUPRC), and `scripts/add_human_review_batch.py` + a `dvc init`-configured remote version new human-reviewed data batches. What's deliberately not built yet is automatic triggering (on a drift alert or a data-volume threshold) — that's designed in code but left as a manual step until there's real production traffic generating real human-review corrections to trigger on. Automating the trigger later is a small follow-up (a scheduled workflow calling these two scripts), not a redesign.
 
 **Repository Structure**
 
 adaptive-ai-inspection/
+├── .github/workflows/     # ci.yml, cd.yml
 ├── configs/
 ├── data/
 ├── docs/
 ├── experiments/
 ├── notebooks/
-├── scripts/
+├── scripts/               # training, registration, promotion, drift, data-versioning CLIs
 ├── src/
-└── tests/
+│   └── inspection/
+│       ├── api/           # FastAPI app (Milestone 6/7)
+│       └── serving/       # MLflow pyfunc wrapper, registry loading, GCS publish (Milestone 6/7/10)
+├── tests/
+├── Dockerfile
+├── docker-compose.yml     # local dev: API + MLflow tracking server
+└── RUNBOOK.md             # one-time GCP setup, training, deploy, drift checks
 
 **Development Philosophy**
 
@@ -110,6 +117,6 @@ Introduce additional complexity only when those limitations justify it.
 
 **Current Status**
 
-Milestones 0-5 are complete. The platform has a working PatchCore-style anomaly localization pipeline validated on MVTec AD, tested for generalization to a held-out unseen defect type, and wrapped in a human-in-the-loop triage layer.
+Milestones 0-9 are complete; Milestone 10 is scaffolded with manual triggers. The platform has a working PatchCore-style anomaly localization pipeline validated on MVTec AD, tested for generalization to a held-out unseen defect type, wrapped in a human-in-the-loop triage layer, served behind a REST API backed by the MLflow Model Registry, deployed to Cloud Run through an automated CI/CD pipeline, and monitored with a metrics endpoint plus an on-demand drift report.
 
-Milestone 6 (MLOps foundation) is underway: wrapping the pipeline in a REST API and container so it can be deployed and called as a service rather than run as a script.
+See `RUNBOOK.md` for how to train the first model, deploy it, promote a new one later, and check for drift. See `docs/architecture.md` for how the serving layer fits into the target architecture.

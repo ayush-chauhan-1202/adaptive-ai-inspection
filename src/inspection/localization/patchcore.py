@@ -14,9 +14,17 @@ from torchvision.transforms import (
 
 
 class ResNetFeatureExtractor:
-    """Extract spatial feature maps from a pretrained ResNet-18."""
+    """Extract spatial feature maps from a ResNet-18.
 
-    def __init__(self, device: str | None = None):
+    `pretrained` defaults to True (ImageNet weights, as every milestone through
+    5 used) and should stay True for any real training run. It exists mainly
+    for offline smoke tests (CI, or a sandbox with no internet access to
+    download torchvision weights): with pretrained=False the extractor still
+    runs end-to-end, just on randomly-initialized features, which is enough to
+    exercise the serving/API plumbing without being a real anomaly detector.
+    """
+
+    def __init__(self, device: str | None = None, pretrained: bool = True):
         if device is None:
             if torch.backends.mps.is_available():
                 device = "mps"
@@ -26,8 +34,9 @@ class ResNetFeatureExtractor:
                 device = "cpu"
 
         self.device = torch.device(device)
+        self.pretrained = pretrained
 
-        weights = ResNet18_Weights.DEFAULT
+        weights = ResNet18_Weights.DEFAULT if pretrained else None
         model = resnet18(weights=weights)
 
         # Keep layers through layer3.

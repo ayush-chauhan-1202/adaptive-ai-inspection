@@ -11,7 +11,6 @@ from inspection.localization.patchcore import (
     compute_anomaly_map,
 )
 
-
 DATA_ROOT = Path(
     "data/raw/mvtec_anomaly_detection"
 )
@@ -202,11 +201,11 @@ def main():
     # --------------------------------------------------
 
     defect_types = sorted(
-        set(
+        {
             result["defect_type"]
             for result in test_results
             if result["sample"].label == 1
-        )
+        }
     )
 
     print(

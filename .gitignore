@@ -16,6 +16,14 @@ htmlcov/
 # Linting
 .ruff_cache/
 
+# Build metadata (should never have been committed - see RUNBOOK/handoff notes)
+*.egg-info/
+
+# MLflow local tracking artifacts (Milestone 6+)
+mlruns/
+mlartifacts/
+mlflow.db
+
 # Jupyter
 .ipynb_checkpoints/
 

@@ -1,0 +1,5 @@
+[core]
+    analytics = false
+    remote = production
+['remote "production"']
+    url = gs://REPLACE-WITH-YOUR-BUCKET/dvc-store
