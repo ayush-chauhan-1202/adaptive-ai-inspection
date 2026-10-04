@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from PIL import Image
-from torchvision.transforms import Compose, Resize, ToTensor, Normalize
+from torchvision.transforms import Compose, Normalize, Resize, ToTensor
 
 
 def get_transform():

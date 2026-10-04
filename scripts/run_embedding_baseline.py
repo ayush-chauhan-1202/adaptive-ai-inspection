@@ -9,7 +9,6 @@ from inspection.features.embeddings import extract_embeddings
 from inspection.models.anomaly import ClassicalAnomalyDetector
 from inspection.models.encoder import ResNet18Encoder
 
-
 DATA_ROOT = Path("data/raw/mvtec_anomaly_detection")
 
 

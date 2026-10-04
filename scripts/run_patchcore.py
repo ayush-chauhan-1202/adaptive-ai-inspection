@@ -12,7 +12,6 @@ from inspection.localization.patchcore import (
     compute_anomaly_map,
 )
 
-
 DATA_ROOT = Path(
     "data/raw/mvtec_anomaly_detection"
 )
@@ -172,7 +171,7 @@ def main():
 
         image = np.clip(image, 0.0, 1.0)
 
-        fig, axes = plt.subplots(
+        _fig, axes = plt.subplots(
             1,
             3,
             figsize=(12, 4),

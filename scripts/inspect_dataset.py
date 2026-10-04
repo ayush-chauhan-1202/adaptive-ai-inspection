@@ -2,7 +2,6 @@ from pathlib import Path
 
 from inspection.data.mvtec import MVTecDataset
 
-
 DATA_ROOT = Path("data/raw/mvtec_anomaly_detection")
 
 
