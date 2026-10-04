@@ -1,0 +1,42 @@
+# Local development stack: the API container plus a local MLflow tracking
+# server, so `docker compose up` gives you the full Milestone 6 loop (train
+# against the tracking server, serve from its registry) without needing any
+# cloud account. This is NOT what Milestone 7 deploys to Cloud Run - that
+# uses a managed MLflow backend or an already-promoted model baked into the
+# image; see RUNBOOK.md.
+
+services:
+  mlflow:
+    # `latest` on purpose: this container is for local dev convenience, not
+    # a pinned production dependency (the real tracking backend used by the
+    # deployed API is configured separately - see RUNBOOK.md). Pin this tag
+    # yourself if you want a reproducible local setup.
+    image: ghcr.io/mlflow/mlflow:latest
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow-data/mlflow.db
+      --default-artifact-root /mlflow-data/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow-data
+
+  api:
+    build: .
+    depends_on:
+      - mlflow
+    ports:
+      - "8080:8080"
+    environment:
+      MLFLOW_TRACKING_URI: "http://mlflow:5000"
+      INSPECTION_MODEL_NAME: "adaptive-ai-inspection"
+      INSPECTION_MODEL_ALIAS: "production"
+      PORT: "8080"
+    # No model exists until you've run train_and_register.py against this
+    # tracking server at least once (see RUNBOOK.md) - until then /inspect
+    # returns 503, which is the intended "no model loaded yet" behavior.
+
+volumes:
+  mlflow-data:
