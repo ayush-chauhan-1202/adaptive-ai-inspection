@@ -118,12 +118,23 @@ class PatchMemoryBank:
                 "Memory bank has not been fitted."
             )
 
-        # Euclidean distance.
-        distances = np.linalg.norm(
-            embeddings[:, None, :]
-            - self.features[None, :, :],
-            axis=2,
-        )
+        # Euclidean distance, via ||a-b||^2 = ||a||^2 + ||b||^2 - 2*a.b instead of
+        # broadcasting embeddings[:, None, :] - self.features[None, :, :]: the
+        # broadcast form materializes a full (num_query_patches, num_bank_patches,
+        # num_channels) tensor before reducing it, which is multiple GB once the
+        # memory bank has tens of thousands of patches. This form only ever holds
+        # (num_query_patches, num_bank_patches)-shaped arrays and a single BLAS
+        # matmul, and gives the exact same distances (mathematically identical,
+        # same floating-point result class).
+        query_sq_norms = np.sum(embeddings**2, axis=1, keepdims=True)
+        bank_sq_norms = np.sum(self.features**2, axis=1, keepdims=True).T
+        cross_term = embeddings @ self.features.T
+
+        distances_sq = query_sq_norms + bank_sq_norms - 2 * cross_term
+        # Floating-point cancellation can leave tiny negative values for
+        # near-zero distances; clamp before sqrt to avoid NaNs.
+        np.maximum(distances_sq, 0, out=distances_sq)
+        distances = np.sqrt(distances_sq)
 
         # Nearest normal patch.
         return distances.min(axis=1)
