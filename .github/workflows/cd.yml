@@ -54,9 +54,9 @@ jobs:
             --region "${{ secrets.GCP_REGION }}" \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "INSPECTION_MODEL_PATH=${{ secrets.PRODUCTION_MODEL_GCS_PATH }},OMP_NUM_THREADS=2,MKL_NUM_THREADS=2,OPENBLAS_NUM_THREADS=2" \
-            --memory 16Gi \
-            --cpu 8 \
+            --set-env-vars "INSPECTION_MODEL_PATH=${{ secrets.PRODUCTION_MODEL_GCS_PATH }}" \
+            --memory 2Gi \
+            --cpu 2 \
             --max-instances 3
 
       - name: Show deployed URL
