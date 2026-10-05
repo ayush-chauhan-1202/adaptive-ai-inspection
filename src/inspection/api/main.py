@@ -30,7 +30,7 @@ from typing import Any
 
 import pandas as pd
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import HTMLResponse, Response
 from PIL import Image, UnidentifiedImageError
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel
@@ -135,6 +135,244 @@ def _downsample(anomaly_map: list[list[float]], size: int) -> list[list[float]]:
             pooled[i, j] = block.mean() if block.size else 0.0
 
     return pooled.round(4).tolist()
+
+INDEX_HTML = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Adaptive AI Inspection</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0b0d12;
+    --panel: #151822;
+    --border: #262b38;
+    --text: #e6e8ee;
+    --muted: #8a90a2;
+    --accent: #5b8cff;
+    --green: #35c46b;
+    --amber: #e3b341;
+    --red: #e5484d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    padding: 32px 16px 64px;
+  }
+  main { width: 100%; max-width: 640px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; }
+  #drop {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    background: var(--panel);
+  }
+  #drop.drag { border-color: var(--accent); }
+  #drop p { margin: 0; color: var(--muted); font-size: 14px; }
+  #fileInput { display: none; }
+  #preview-wrap {
+    position: relative;
+    margin-top: 20px;
+    display: none;
+    line-height: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  #previewImg { width: 100%; display: block; }
+  #heatmapCanvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+  #runBtn {
+    margin-top: 16px;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  #runBtn:disabled { opacity: 0.5; cursor: default; }
+  #result { margin-top: 20px; display: none; }
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+  }
+  .badge.normal { background: rgba(53,196,107,0.15); color: var(--green); }
+  .badge.review { background: rgba(227,179,65,0.15); color: var(--amber); }
+  .badge.defect { background: rgba(229,72,77,0.15); color: var(--red); }
+  .stats { margin-top: 12px; display: flex; gap: 24px; color: var(--muted); font-size: 13px; }
+  .stats b { color: var(--text); font-weight: 600; }
+  #error {
+    margin-top: 16px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: rgba(229,72,77,0.1);
+    color: var(--red);
+    font-size: 13px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Adaptive AI Inspection</h1>
+  <p class="sub">Upload a product image to run it through the PatchCore anomaly-localization model.</p>
+
+  <div id="drop">
+    <p>Click to choose an image, or drag one here</p>
+    <input id="fileInput" type="file" accept="image/*" />
+  </div>
+
+  <div id="preview-wrap">
+    <img id="previewImg" />
+    <canvas id="heatmapCanvas"></canvas>
+  </div>
+
+  <button id="runBtn" disabled>Run inspection</button>
+
+  <div id="error"></div>
+
+  <div id="result">
+    <span id="badge" class="badge"></span>
+    <div class="stats">
+      <div>Score <b id="scoreVal">-</b></div>
+      <div>Latency <b id="latencyVal">-</b></div>
+    </div>
+  </div>
+</main>
+
+<script>
+  const drop = document.getElementById("drop");
+  const fileInput = document.getElementById("fileInput");
+  const previewWrap = document.getElementById("preview-wrap");
+  const previewImg = document.getElementById("previewImg");
+  const canvas = document.getElementById("heatmapCanvas");
+  const runBtn = document.getElementById("runBtn");
+  const resultEl = document.getElementById("result");
+  const badgeEl = document.getElementById("badge");
+  const scoreEl = document.getElementById("scoreVal");
+  const latencyEl = document.getElementById("latencyVal");
+  const errorEl = document.getElementById("error");
+
+  let selectedFile = null;
+
+  drop.addEventListener("click", () => fileInput.click());
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("drag"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("drag"));
+  drop.addEventListener("drop", (e) => {
+    e.preventDefault();
+    drop.classList.remove("drag");
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    selectedFile = file;
+    const url = URL.createObjectURL(file);
+    previewImg.onload = () => {
+      canvas.width = previewImg.clientWidth;
+      canvas.height = previewImg.clientHeight;
+      canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    };
+    previewImg.src = url;
+    previewWrap.style.display = "block";
+    runBtn.disabled = false;
+    resultEl.style.display = "none";
+    errorEl.style.display = "none";
+  }
+
+  function heatColor(t) {
+    const hue = 240 - 240 * t;
+    return `hsla(${hue}, 85%, 50%, ${0.15 + 0.45 * t})`;
+  }
+
+  function drawHeatmap(grid, size) {
+    const ctx = canvas.getContext("2d");
+    canvas.width = previewImg.clientWidth;
+    canvas.height = previewImg.clientHeight;
+
+    let min = Infinity, max = -Infinity;
+    for (const row of grid) for (const v of row) { if (v < min) min = v; if (v > max) max = v; }
+    const range = max - min || 1;
+
+    const cellW = canvas.width / size;
+    const cellH = canvas.height / size;
+
+    for (let i = 0; i < size; i++) {
+      for (let j = 0; j < size; j++) {
+        const t = (grid[i][j] - min) / range;
+        ctx.fillStyle = heatColor(t);
+        ctx.fillRect(j * cellW, i * cellH, cellW + 1, cellH + 1);
+      }
+    }
+  }
+
+  function decisionClass(decision) {
+    if (decision === "AUTO_NORMAL") return "normal";
+    if (decision === "HUMAN_REVIEW") return "review";
+    if (decision === "AUTO_DEFECT") return "defect";
+    return "";
+  }
+
+  runBtn.addEventListener("click", async () => {
+    if (!selectedFile) return;
+    runBtn.disabled = true;
+    runBtn.textContent = "Running\u2026";
+    errorEl.style.display = "none";
+
+    const form = new FormData();
+    form.append("file", selectedFile);
+
+    try {
+      const res = await fetch("/inspect", { method: "POST", body: form });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || `Request failed (${res.status})`);
+      }
+      const data = await res.json();
+
+      drawHeatmap(data.heatmap_preview, data.heatmap_preview_size);
+
+      badgeEl.textContent = data.decision;
+      badgeEl.className = "badge " + decisionClass(data.decision);
+      scoreEl.textContent = data.score.toFixed(3);
+      latencyEl.textContent = Math.round(data.latency_ms) + " ms";
+      resultEl.style.display = "block";
+    } catch (err) {
+      errorEl.textContent = err.message || "Something went wrong.";
+      errorEl.style.display = "block";
+    } finally {
+      runBtn.disabled = false;
+      runBtn.textContent = "Run inspection";
+    }
+  });
+</script>
+</body>
+</html>
+"""
+
+
+@app.get("/", response_class=HTMLResponse)
+def index() -> str:
+    return INDEX_HTML
 
 
 @app.get("/health", response_model=HealthResponse)
