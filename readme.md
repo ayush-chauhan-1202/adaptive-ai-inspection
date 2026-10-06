@@ -9,6 +9,15 @@ An industrial defect-detection system that localizes anomalies on images (not ju
 
 **[https://adaptive-ai-inspection-tjk4m6eu4q-uc.a.run.app](https://adaptive-ai-inspection-tjk4m6eu4q-uc.a.run.app)** — upload an image, get an anomaly heatmap and a decision back in your browser.
 
+Don't have a defect image on hand? [`examples/`](examples/) has a few sample images pulled from the MVTec AD test set — download one and drop it straight into the demo:
+
+| File | Expected result |
+|---|---|
+| [`examples/normal.png`](examples/normal.png) | ✅ AUTO_NORMAL |
+| [`examples/defect_crack.png`](examples/defect_crack.png) | 🔴 AUTO_DEFECT |
+| [`examples/defect_small.png`](examples/defect_small.png) | 🔴 AUTO_DEFECT |
+| [`examples/defect_contamination.png`](examples/defect_contamination.png) | 🔴 AUTO_DEFECT |
+
 (It's on Cloud Run's free tier, which scales to zero when idle — the first request after a quiet period can take a few seconds to cold-start. Everything after that is fast.)
 
 ## What this is
@@ -54,12 +63,10 @@ A real request/response from the live service, shown through the browser UI — 
 
 ## Engineering highlights
 
-A few real problems this project surfaced, and how they were actually solved (not glossed over):
-
-- **Found a genuine bug inside MLflow itself.** The production model failed to load from Cloud Storage with a cryptic 404. Traced it past this project's own code into MLflow 3.16.1's GCS artifact-loading logic — an off-by-one in how it splits a bare `gs://bucket/path` URI — confirmed by reading the installed library's source and MLflow's own GitHub history, not by guessing. Worked around with a trailing-slash path convention, documented so the next person doesn't have to re-derive it.
-- **Root-caused a cloud OOM instead of just throwing more RAM at it.** The deployed service was getting killed on Cloud Run with out-of-memory errors. Scaling memory up (2Gi → 4Gi → 8Gi → 16Gi) made it *run*, but that's a band-aid, not a fix — so the real cause got found: the anomaly-scoring code was materializing a full dense `(queries × memory-bank-size × channels)` tensor in memory before reducing it, which scales into multiple gigabytes by design. Rewrote it as a single BLAS matrix multiply using the `‖a−b‖² = ‖a‖² + ‖b‖² − 2·a·b` identity — mathematically identical output (verified bit-for-bit against the old implementation), **8x less memory and ~7x lower latency** (17s → 2.2s), and the service now runs comfortably on the original 2Gi/2vCPU Cloud Run default.
-- **Keyless cloud deploys.** GitHub Actions authenticates to GCP via Workload Identity Federation — no long-lived service-account JSON keys sitting in repo secrets.
-- **Config lives in code, not in someone's terminal history.** Every manual `gcloud` fix made while debugging was folded back into `cd.yml` and verified through an actual pipeline run, so the next deploy can't silently undo a fix that only existed as a live patch.
+- Traced a production model-loading failure past this project's own code into an actual bug in MLflow itself, and shipped a fix rather than guessing around it.
+- Found and fixed a memory/latency bottleneck in the core scoring algorithm — **8x less memory, ~7x lower latency**, verified against bit-identical output.
+- Keyless CI/CD to GCP via Workload Identity Federation — no long-lived service-account keys in the repo.
+- Every production fix is baked into the deploy pipeline itself (`cd.yml`), not left as a manual patch that the next deploy would silently undo.
 
 ## Under the hood: training → production
 
@@ -139,6 +146,7 @@ flowchart TD
 ├── docs/
 │   ├── architecture.md     Deeper system design writeup
 │   └── images/              README screenshots
+├── examples/                Sample images to try against the live demo
 ├── .github/workflows/
 │   ├── ci.yml               Lint + test
 │   └── cd.yml                Build → push → deploy to Cloud Run
